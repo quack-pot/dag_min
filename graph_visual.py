@@ -51,6 +51,7 @@ gates = {
 # Example: uniform dummy weights for visualization
 dummy_weights = torch.ones((6,6)) * 10
 node_labels = {0:'x0',1:'x1',2:'h2',3:'h3',4:'h4',5:'y'}
+func_colors = ['#fe9a99', '#c2ebc1', '#fed899', '#bfdbe8', '#d5bfaf', '#aeb1d7', '#f8e7ec']
 
 # Plot all gates
 fig, axes = plt.subplots(2, 4, figsize=(20,10))
@@ -77,7 +78,7 @@ for i, (name, adj) in enumerate(gates.items()):
     
     pos = nx.spring_layout(G, seed=42)
     nx.draw(G, pos, with_labels=True, labels=node_labels, node_size=node_sizes,
-            node_color='lightblue', width=edge_widths, edge_color=edge_colors,
+            node_color=func_colors[i], width=edge_widths, edge_color=edge_colors,
             arrowsize=20, ax=axes[i])
     axes[i].set_title(name)
 
