@@ -1,5 +1,6 @@
 import torch
 import dataclasses
+from .. import graphs
 
 @dataclasses.dataclass
 class StaticSparseDAGCreateInfo:
@@ -18,7 +19,7 @@ class StaticSparseDAGTrainInfo:
     learning_rate: float = 0.05
 
     lambda_edges: float = 1e-5
-    lambda_nodes: float = 1.35e-5
+    lambda_nodes: float = 1.35e-4
     node_threshold_strength: float = 10.0
 
 class StaticSparseDAG():
@@ -28,7 +29,7 @@ class StaticSparseDAG():
     ## *
     ## *=================================================
 
-    def __init__(self, create_info: StaticSparseDAGCreateInfo):
+    def __init__(self, create_info: StaticSparseDAGCreateInfo) -> None:
         super().__init__()
 
         # ? Static Sparse DAG Model Parameters
@@ -195,3 +196,85 @@ class StaticSparseDAG():
                         train_info.lambda_nodes,
                         train_info.node_threshold_strength,
                     )
+
+    ## *=================================================
+    ## *
+    ## * extractNeuralNode
+    ## *
+    ## *=================================================
+
+    def extractNeuralNode(
+        self,
+        idx: int,
+        idx_to_node: dict[int, graphs.Node],
+        activity_threshold: float,
+    ) -> graphs.NeuralNode | None:
+        if idx in idx_to_node:
+            return None
+
+        incoming_edges: list[graphs.NeuralNodeIncomingEdge] = []
+        bias: float = float(self.biases[idx].item())
+
+        edge_weights: torch.Tensor = self.weights[:idx, idx] * self.mask[:idx, idx]
+        for jdx in range(idx):
+            weight: float = float(edge_weights[jdx].item())
+            if abs(weight) < activity_threshold:
+                continue
+
+            existing_node: graphs.Node | None = idx_to_node.get(jdx)
+            if not existing_node is None:
+                incoming_edges.append(graphs.NeuralNodeIncomingEdge(existing_node, weight))
+                continue
+
+            existing_node = self.extractNeuralNode(jdx, idx_to_node, activity_threshold)
+            if existing_node is None:
+                continue
+
+            incoming_edges.append(graphs.NeuralNodeIncomingEdge(existing_node, weight))
+
+        neural_node: graphs.NeuralNode = graphs.NeuralNode(incoming_edges, bias)
+        idx_to_node[idx] = neural_node
+
+        return neural_node
+
+    ## *=================================================
+    ## *
+    ## * extractDAG
+    ## *
+    ## *=================================================
+
+    def extractDAG(self, activity_threshold: float = 0.1) -> graphs.IOGraph:
+        input_nodes: list[graphs.InputNode] = []
+        hidden_nodes: list[graphs.Node] = []
+        output_nodes: list[graphs.Node] = []
+
+        idx_to_node: dict[int, graphs.Node] = {}
+
+        for idx in range(0, self.input_node_count):
+            input_node: graphs.InputNode = graphs.InputNode()
+
+            idx_to_node[idx] = input_node
+
+            input_nodes.append(input_node)
+        
+        for idx in range(self.input_node_count + self.hidden_node_count, self.total_node_count):
+            output_node: graphs.NeuralNode | None = self.extractNeuralNode(idx, idx_to_node, activity_threshold)
+
+            if output_node is None:
+                continue
+
+            output_nodes.append(output_node)
+
+        for idx in range(self.input_node_count, self.total_node_count - self.output_node_count):
+            hidden_node: graphs.Node | None = idx_to_node.get(idx)
+
+            if hidden_node is None:
+                continue
+
+            hidden_nodes.append(hidden_node)
+
+        return graphs.IOGraph(
+            input_nodes,
+            output_nodes,
+            hidden_nodes,
+        )
