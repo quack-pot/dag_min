@@ -1,12 +1,6 @@
-from .node import Node
-from .io_graph import IOGraph
-from .input_node import InputNode
-from .neural_node import NeuralNode, NeuralNodeIncomingEdge
+from .graph import Graph, GraphCreateInfo
 
 __all__ = [
-    "Node",
-    "IOGraph",
-    "InputNode",
-    "NeuralNode",
-    "NeuralNodeIncomingEdge",
+    "Graph",
+    "GraphCreateInfo",
 ]
